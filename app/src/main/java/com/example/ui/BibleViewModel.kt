@@ -197,13 +197,21 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Audio Playback with Media3 ExoPlayer
+    // Audio Playback with Media3 ExoPlayer & Speech Narration Fallback
     fun playCurrentChapterAudio() {
         val bookInfo = BibleCatalog.findBook(_selectedBook.value)
+        val verses = BibleCatalog.generateVersesForChapter(_selectedBook.value, _selectedChapter.value)
+        val textToRead = verses.joinToString(". ") {
+            when (_currentLanguage.value) {
+                AppLanguage.TELUGU -> "${it.verseNumber}. ${it.textTelugu}"
+                AppLanguage.TAMIL -> "${it.verseNumber}. ${it.textTamil}"
+                else -> "${it.verseNumber}. ${it.textEnglish}"
+            }
+        }
         val title = "${bookInfo.nameForLanguage(_currentLanguage.value)} Chapter ${_selectedChapter.value}"
-        val subtitle = "Audio Bible Stream - ${bookInfo.testament} Testament"
-        val url = BibleCatalog.getAudioStreamUrl(_selectedBook.value, _selectedChapter.value)
-        audioPlayerManager.playChapterAudio(title, subtitle, url)
+        val subtitle = "KJV Audio Bible Reading (${_currentLanguage.value.displayName})"
+        val url = BibleCatalog.getAudioStreamUrl(_selectedBook.value, _selectedChapter.value, _currentLanguage.value)
+        audioPlayerManager.playChapterAudio(title, subtitle, url, textToRead)
     }
 
     fun playMediaItem(item: MediaItem) {
@@ -211,11 +219,15 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playKidsStoryNarration(storyTitle: String, pageNumber: Int) {
-        val streamUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
+        val streamUrl = BibleCatalog.getAudioStreamUrl("John", pageNumber, _currentLanguage.value)
+        val activeStory = _activeKidsStory.value
+        val page = activeStory?.pages?.getOrNull(pageNumber - 1)
+        val storyText = page?.text(_currentLanguage.value)
         audioPlayerManager.playChapterAudio(
             title = storyTitle,
             subtitle = "Kids Story Audio Narration - Page $pageNumber",
-            streamUrl = streamUrl
+            streamUrl = streamUrl,
+            textToSpeak = storyText
         )
     }
 

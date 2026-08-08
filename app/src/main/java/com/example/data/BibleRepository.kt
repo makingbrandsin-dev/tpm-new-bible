@@ -649,38 +649,38 @@ class BibleRepository(private val dao: BibleDao) {
         return listOf(
             MediaItem(
                 id = "m1",
-                title = "The Light of the World",
-                speakerOrArtist = "TPM Pastor Message",
-                category = "Sermon",
-                duration = "24:15",
-                audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+                title = "Gospel of John Chapter 1 (KJV)",
+                speakerOrArtist = "Audio Bible Reading",
+                category = "Scripture",
+                duration = "05:15",
+                audioUrl = "https://audio2.wordproject.org/bibles/app/audio/1/43/1.mp3",
                 thumbnailUrl = "https://images.unsplash.com/photo-1509021436468-d51030076a08?w=500"
             ),
             MediaItem(
                 id = "m2",
-                title = "Abide With Me (Hymn #142)",
-                speakerOrArtist = "Sanctuary Choir",
-                category = "Hymn",
-                duration = "04:32",
-                audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+                title = "Psalm 23 Audio Scripture",
+                speakerOrArtist = "Sanctuary Devotional",
+                category = "Devotional",
+                duration = "02:30",
+                audioUrl = "https://audio2.wordproject.org/bibles/app/audio/1/19/23.mp3",
                 thumbnailUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500"
             ),
             MediaItem(
                 id = "m3",
-                title = "Psalm 23 Meditative Audio Reading",
-                speakerOrArtist = "Audio Scripture",
-                category = "Devotional",
-                duration = "03:10",
-                audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+                title = "Gospel of Matthew Chapter 5 (Sermon on the Mount)",
+                speakerOrArtist = "KJV Audio Narration",
+                category = "Scripture",
+                duration = "07:10",
+                audioUrl = "https://audio2.wordproject.org/bibles/app/audio/1/40/5.mp3",
                 thumbnailUrl = "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=500"
             ),
             MediaItem(
                 id = "m4",
-                title = "Faith like a Mustard Seed",
-                speakerOrArtist = "Sunday Worship Sermon",
-                category = "Sermon",
-                duration = "32:00",
-                audioUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+                title = "Romans Chapter 8 Audio Reading",
+                speakerOrArtist = "Audio Scripture",
+                category = "Devotional",
+                duration = "06:45",
+                audioUrl = "https://audio2.wordproject.org/bibles/app/audio/1/45/8.mp3",
                 thumbnailUrl = "https://images.unsplash.com/photo-1438232992991-995b7058bbb3?w=500"
             )
         )

@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem as Media3Item
 import androidx.media3.common.Player
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 data class ExoPlaybackState(
     val isPlaying: Boolean = false,
@@ -31,6 +35,7 @@ data class ExoPlaybackState(
     val currentSubtitle: String = "Select a chapter or sermon",
     val playbackSpeed: Float = 1.0f,
     val isBuffering: Boolean = false,
+    val isUsingTts: Boolean = false,
     val error: String? = null
 ) {
     val progressFraction: Float
@@ -53,6 +58,10 @@ data class ExoPlaybackState(
 class AudioPlayerManager(private val context: Context) {
 
     private var exoPlayer: ExoPlayer? = null
+    private var ttsEngine: TextToSpeech? = null
+    private var isTtsReady = false
+    private var currentTextToSpeak: String? = null
+
     private val scope = CoroutineScope(Dispatchers.Main + Job())
     private var progressJob: Job? = null
 
@@ -72,7 +81,47 @@ class AudioPlayerManager(private val context: Context) {
 
     init {
         initExoPlayer()
+        initTextToSpeech()
         registerMediaReceiver()
+    }
+
+    private fun initTextToSpeech() {
+        try {
+            ttsEngine = TextToSpeech(context.applicationContext) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    isTtsReady = true
+                    ttsEngine?.language = Locale.US
+                    ttsEngine?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            _playbackState.value = _playbackState.value.copy(
+                                isPlaying = true,
+                                isUsingTts = true,
+                                isBuffering = false,
+                                error = null
+                            )
+                            updateLockscreenNotification()
+                        }
+
+                        override fun onDone(utteranceId: String?) {
+                            _playbackState.value = _playbackState.value.copy(
+                                isPlaying = false,
+                                isUsingTts = false
+                            )
+                            updateLockscreenNotification()
+                        }
+
+                        override fun onError(utteranceId: String?) {
+                            _playbackState.value = _playbackState.value.copy(
+                                isPlaying = false,
+                                isUsingTts = false
+                            )
+                        }
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun registerMediaReceiver() {
@@ -123,13 +172,76 @@ class AudioPlayerManager(private val context: Context) {
                     }
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        _playbackState.value = _playbackState.value.copy(
-                            isPlaying = false,
-                            error = error.localizedMessage ?: "Playback error"
-                        )
-                        NotificationHelper.cancelLockscreenMediaNotification(context)
+                        // If online stream fails or network is missing, fallback to Speech Narration seamlessly
+                        val textToRead = currentTextToSpeak
+                        if (!textToRead.isNullOrBlank() && isTtsReady) {
+                            speakWithTts(textToRead)
+                            try {
+                                Toast.makeText(
+                                    context.applicationContext,
+                                    "Network offline • Reading KJV Scripture via Speech 🎙️",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        } else {
+                            val errorMessage = if (error.cause is java.net.UnknownHostException) {
+                                "Network unavailable for audio stream"
+                            } else {
+                                error.localizedMessage ?: "Playback error"
+                            }
+                            _playbackState.value = _playbackState.value.copy(
+                                isPlaying = false,
+                                isBuffering = false,
+                                isUsingTts = false,
+                                error = errorMessage
+                            )
+                            NotificationHelper.cancelLockscreenMediaNotification(context)
+                            try {
+                                Toast.makeText(
+                                    context.applicationContext,
+                                    "Audio Notice: $errorMessage",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
                     }
                 })
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun speakWithTts(text: String) {
+        stopExoPlayer()
+        currentTextToSpeak = text
+        _playbackState.value = _playbackState.value.copy(
+            isPlaying = true,
+            isUsingTts = true,
+            isBuffering = false,
+            currentSubtitle = "${_playbackState.value.currentSubtitle} (Speech)",
+            error = null
+        )
+        ttsEngine?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "kjv_chapter_narration")
+        updateLockscreenNotification()
+    }
+
+    private fun stopExoPlayer() {
+        try {
+            exoPlayer?.stop()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun stopTts() {
+        try {
+            if (ttsEngine?.isSpeaking == true) {
+                ttsEngine?.stop()
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -149,12 +261,15 @@ class AudioPlayerManager(private val context: Context) {
     }
 
     fun playMedia(mediaItem: MediaItem) {
+        stopTts()
+        currentTextToSpeak = null
         val player = exoPlayer ?: return
         try {
             _playbackState.value = _playbackState.value.copy(
                 currentMediaId = mediaItem.id,
                 currentTitle = mediaItem.title,
                 currentSubtitle = mediaItem.speakerOrArtist,
+                isUsingTts = false,
                 error = null
             )
             val media3Item = Media3Item.fromUri(mediaItem.audioUrl)
@@ -167,13 +282,21 @@ class AudioPlayerManager(private val context: Context) {
         }
     }
 
-    fun playChapterAudio(title: String, subtitle: String, streamUrl: String) {
+    fun playChapterAudio(
+        title: String,
+        subtitle: String,
+        streamUrl: String,
+        textToSpeak: String? = null
+    ) {
+        stopTts()
+        currentTextToSpeak = textToSpeak
         val player = exoPlayer ?: return
         try {
             _playbackState.value = _playbackState.value.copy(
                 currentMediaId = "chapter_$title",
                 currentTitle = title,
                 currentSubtitle = subtitle,
+                isUsingTts = false,
                 error = null
             )
             val media3Item = Media3Item.fromUri(streamUrl)
@@ -182,11 +305,26 @@ class AudioPlayerManager(private val context: Context) {
             player.play()
             updateLockscreenNotification()
         } catch (e: Exception) {
-            e.printStackTrace()
+            if (!textToSpeak.isNullOrBlank() && isTtsReady) {
+                speakWithTts(textToSpeak)
+            } else {
+                e.printStackTrace()
+            }
         }
     }
 
     fun togglePlayPause() {
+        if (_playbackState.value.isUsingTts || ttsEngine?.isSpeaking == true) {
+            if (ttsEngine?.isSpeaking == true) {
+                stopTts()
+                _playbackState.value = _playbackState.value.copy(isPlaying = false)
+            } else if (!currentTextToSpeak.isNullOrEmpty()) {
+                speakWithTts(currentTextToSpeak!!)
+            }
+            updateLockscreenNotification()
+            return
+        }
+
         val player = exoPlayer ?: return
         if (player.isPlaying) {
             player.pause()
@@ -200,10 +338,12 @@ class AudioPlayerManager(private val context: Context) {
     }
 
     fun stopAndClear() {
-        val player = exoPlayer ?: return
-        player.stop()
+        stopTts()
+        stopExoPlayer()
+        currentTextToSpeak = null
         _playbackState.value = _playbackState.value.copy(
             isPlaying = false,
+            isUsingTts = false,
             currentPositionMs = 0L
         )
         NotificationHelper.cancelLockscreenMediaNotification(context)
@@ -270,6 +410,12 @@ class AudioPlayerManager(private val context: Context) {
 
     fun release() {
         progressJob?.cancel()
+        stopTts()
+        try {
+            ttsEngine?.shutdown()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         try {
             context.unregisterReceiver(mediaControlReceiver)
         } catch (e: Exception) {

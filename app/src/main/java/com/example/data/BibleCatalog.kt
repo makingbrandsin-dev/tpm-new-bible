@@ -103,9 +103,18 @@ object BibleCatalog {
     }
 
     // Audio stream URL helper for any chapter (provides clean KJV MP3 streams)
-    fun getAudioStreamUrl(book: String, chapter: Int): String {
-        // High quality public audio stream for Bible chapters
-        return "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-${(book.hashCode().coerceAtLeast(1) % 15) + 1}.mp3"
+    fun getAudioStreamUrl(book: String, chapter: Int, lang: AppLanguage = AppLanguage.ENGLISH): String {
+        val bookIndex = (BOOKS.indexOfFirst {
+            it.id.equals(book, ignoreCase = true) ||
+            it.nameEnglish.equals(book, ignoreCase = true)
+        }.takeIf { it >= 0 } ?: 42) + 1
+
+        val langCode = when (lang) {
+            AppLanguage.ENGLISH -> 1
+            AppLanguage.TELUGU -> 11
+            AppLanguage.TAMIL -> 10
+        }
+        return "https://audio2.wordproject.org/bibles/app/audio/$langCode/$bookIndex/$chapter.mp3"
     }
 
     // Generates authentic multi-lingual scripture verses for any selected book & chapter
