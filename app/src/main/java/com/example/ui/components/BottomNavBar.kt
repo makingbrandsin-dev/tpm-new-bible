@@ -64,7 +64,7 @@ fun SanctuaryBottomNavBar(
 ) {
     val items = listOf(
         NavItemData(MainTab.HOME, "Home", Icons.Filled.Home, Icons.Outlined.Home),
-        NavItemData(MainTab.BIBLE, "Bible", Icons.Filled.MenuBook, Icons.Outlined.MenuBook),
+        NavItemData(MainTab.BIBLE, "Reader", Icons.Filled.MenuBook, Icons.Outlined.MenuBook),
         NavItemData(MainTab.AUDIO, "Audio", Icons.Filled.Headset, Icons.Outlined.Headset),
         NavItemData(MainTab.KIDS, "Kids", Icons.Filled.ChildCare, Icons.Outlined.ChildCare),
         NavItemData(MainTab.MEDIA, "Media", Icons.Filled.PlayCircle, Icons.Outlined.PlayCircle)

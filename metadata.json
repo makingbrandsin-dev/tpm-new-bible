@@ -1,6 +1,6 @@
 {
   "name": "TPM Bible",
-  "description": "Sanctuary in your Pocket - Multi-language Bible, Kids Stories, Audio & Memorization",
+  "description": "TPM Bible - Multi-language Scripture, Kids Stories, Audio & Scripture Memorization",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

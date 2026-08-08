@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,7 +21,9 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DownloadForOffline
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MilitaryTech
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -37,9 +40,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.model.AppLanguage
 import com.example.ui.MainTab
 import com.example.ui.theme.CelestialGold
 import com.example.ui.theme.MutedOutlineVariant
+import com.example.ui.theme.OnPrimaryDark
 import com.example.ui.theme.OnSurfaceLight
 import com.example.ui.theme.OnSurfaceVariantMuted
 import com.example.ui.theme.SurfaceContainerHigh
@@ -51,16 +56,24 @@ fun SanctuaryDrawerContent(
     onNavigateTab: (MainTab) -> Unit,
     onOpenBookmarks: () -> Unit,
     onOpenNotes: () -> Unit,
-    onOpenMemorization: () -> Unit
+    onOpenMemorization: () -> Unit,
+    onOpenAbout: () -> Unit,
+    onOpenNotifications: () -> Unit,
+    currentLanguage: AppLanguage = AppLanguage.ENGLISH,
+    onLanguageSelected: (AppLanguage) -> Unit = {}
 ) {
     Column(
         modifier = Modifier
             .fillMaxHeight()
             .width(300.dp)
             .background(SurfaceContainerLow)
+            .statusBarsPadding()
             .padding(24.dp)
             .testTag("sanctuary_drawer")
     ) {
+        // Top 20% empty spacing as requested
+        Spacer(modifier = Modifier.fillMaxHeight(0.18f))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -68,14 +81,14 @@ fun SanctuaryDrawerContent(
         ) {
             Column {
                 Text(
-                    text = "Sanctuary",
+                    text = "TPM Bible",
                     fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 32.sp,
                     color = CelestialGold
                 )
                 Text(
-                    text = "In your Pocket",
+                    text = "The Pentecostal Mission",
                     fontSize = 12.sp,
                     color = OnSurfaceVariantMuted
                 )
@@ -90,7 +103,7 @@ fun SanctuaryDrawerContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         DrawerMenuItem(
             icon = Icons.Default.MilitaryTech,
@@ -120,12 +133,83 @@ fun SanctuaryDrawerContent(
         )
 
         DrawerMenuItem(
-            icon = Icons.Default.DownloadForOffline,
-            label = "Offline Bible",
+            icon = Icons.Default.NotificationsActive,
+            label = "Daily Notifications",
             onClick = {
+                onOpenNotifications()
                 onCloseDrawer()
             }
         )
+
+        DrawerMenuItem(
+            icon = Icons.Default.Info,
+            label = "About TPM Bible",
+            onClick = {
+                onOpenAbout()
+                onCloseDrawer()
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Default Language Selection Card
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(SurfaceContainerHigh)
+                .padding(12.dp)
+                .testTag("drawer_default_language_card")
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Default Language",
+                    tint = CelestialGold,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = "Default App Language",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = OnSurfaceLight
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(
+                    AppLanguage.ENGLISH to "English",
+                    AppLanguage.TAMIL to "தமிழ்",
+                    AppLanguage.TELUGU to "తెలుగు"
+                ).forEach { (lang, label) ->
+                    val isSel = currentLanguage == lang
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSel) CelestialGold else SurfaceContainerLow)
+                            .clickable { onLanguageSelected(lang) }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isSel) OnPrimaryDark else OnSurfaceVariantMuted
+                        )
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -133,14 +217,23 @@ fun SanctuaryDrawerContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        DrawerMenuItem(
-            icon = Icons.Default.Settings,
-            label = "Settings",
-            onClick = {
-                onNavigateTab(MainTab.HOME)
-                onCloseDrawer()
-            }
-        )
+        // Version Info Footer
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "TPM Bible",
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = CelestialGold
+            )
+            Text(
+                text = "Version 1.0.0 (Build 100)",
+                fontSize = 11.sp,
+                color = OnSurfaceVariantMuted
+            )
+        }
     }
 }
 

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -30,7 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.AudioState
+import com.example.audio.ExoPlaybackState
 import com.example.ui.theme.CelestialGold
 import com.example.ui.theme.OnPrimaryDark
 import com.example.ui.theme.OnSurfaceLight
@@ -39,17 +40,25 @@ import com.example.ui.theme.SurfaceContainerHigh
 
 @Composable
 fun FloatingAudioDock(
-    audioState: AudioState,
+    exoState: ExoPlaybackState,
     onTogglePlayPause: () -> Unit,
     onOpenFullPlayer: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    fallbackTitle: String = "TPM Audio Bible",
+    fallbackSubtitle: String = "Tap play to listen • KJV Audio"
 ) {
-    val item = audioState.currentItem ?: return
+    val isLoaded = exoState.currentMediaId != null
+    val displayTitle = if (isLoaded) exoState.currentTitle else fallbackTitle
+    val displaySubtitle = if (isLoaded) {
+        "${exoState.currentSubtitle} • ${exoState.currentTimeFormatted} / ${exoState.totalTimeFormatted}"
+    } else {
+        fallbackSubtitle
+    }
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .padding(horizontal = 14.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable { onOpenFullPlayer() }
             .testTag("floating_audio_dock"),
@@ -58,32 +67,51 @@ fun FloatingAudioDock(
         shadowElevation = 8.dp
     ) {
         Column {
-            LinearProgressIndicator(
-                progress = { audioState.progress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(3.dp),
-                color = CelestialGold,
-                trackColor = SurfaceContainerHigh
-            )
+            if (isLoaded) {
+                LinearProgressIndicator(
+                    progress = { exoState.progressFraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp),
+                    color = CelestialGold,
+                    trackColor = SurfaceContainerHigh
+                )
+            }
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(CelestialGold.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Headset,
+                        contentDescription = "Audio Player",
+                        tint = CelestialGold,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = item.title,
-                        fontSize = 14.sp,
+                        text = displayTitle,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = OnSurfaceLight,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "${item.speakerOrArtist} • ${audioState.currentTimeStr} / ${audioState.totalTimeStr}",
+                        text = displaySubtitle,
                         fontSize = 11.sp,
                         color = OnSurfaceVariantMuted,
                         maxLines = 1,
@@ -96,16 +124,16 @@ fun FloatingAudioDock(
                 IconButton(
                     onClick = onTogglePlayPause,
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
                         .background(CelestialGold)
                         .testTag("dock_play_pause_button")
                 ) {
                     Icon(
-                        imageVector = if (audioState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (audioState.isPlaying) "Pause" else "Play",
+                        imageVector = if (exoState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (exoState.isPlaying) "Pause" else "Play",
                         tint = OnPrimaryDark,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

@@ -3,43 +3,17 @@ package com.example.ui.kids
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.NewReleases
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,16 +29,7 @@ import coil.compose.AsyncImage
 import com.example.model.AppLanguage
 import com.example.model.KidsStory
 import com.example.ui.BibleViewModel
-import com.example.ui.theme.CelestialGold
-import com.example.ui.theme.KidsBlue
-import com.example.ui.theme.KidsGreen
-import com.example.ui.theme.KidsOrange
-import com.example.ui.theme.KidsPink
-import com.example.ui.theme.OnPrimaryDark
-import com.example.ui.theme.OnSurfaceLight
-import com.example.ui.theme.OnSurfaceVariantMuted
-import com.example.ui.theme.SurfaceContainer
-import com.example.ui.theme.SurfaceDark
+import com.example.ui.theme.*
 
 @Composable
 fun KidsBibleScreen(
@@ -73,17 +38,31 @@ fun KidsBibleScreen(
     modifier: Modifier = Modifier
 ) {
     val currentLang by viewModel.currentLanguage.collectAsState()
-    val stories = viewModel.repository.getKidsStories()
-    val featuredStory = stories.first()
-    val otherStories = stories.drop(1)
+    val quizScores by viewModel.quizScores.collectAsState()
+    val allStories = viewModel.repository.getKidsStories()
+
+    var selectedCategory by remember { mutableStateOf("All") }
+
+    val categories = listOf("All", "Old Testament", "New Testament", "Miracles")
+
+    val filteredStories = when (selectedCategory) {
+        "Old Testament" -> allStories.filter { it.category == "Old Testament" }
+        "New Testament" -> allStories.filter { it.category == "New Testament" }
+        "Miracles" -> allStories.filter { it.category == "Miracles" }
+        else -> allStories
+    }
+
+    val featuredStory = filteredStories.firstOrNull() ?: allStories.first()
+    val remainingStories = filteredStories.drop(if (filteredStories.contains(featuredStory)) 1 else 0)
 
     Column(
         modifier = modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(top = 16.dp, bottom = 16.dp, start = 16.dp, end = 16.dp)
             .testTag("kids_bible_screen"),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // Kids Hero Header
         Column(
@@ -102,9 +81,9 @@ fun KidsBibleScreen(
                 )
 
                 Text(
-                    text = "Kids Bible",
+                    text = "Sunday School Stories",
                     fontFamily = FontFamily.Serif,
-                    fontSize = 38.sp,
+                    fontSize = 30.sp,
                     fontWeight = FontWeight.Bold,
                     color = CelestialGold
                 )
@@ -118,293 +97,307 @@ fun KidsBibleScreen(
             }
 
             Text(
-                text = "Discover the amazing stories of the Bible through fun adventures!",
-                fontSize = 14.sp,
+                text = "Learn Bible stories with Teacher Grace & earn quiz marks!",
+                fontSize = 13.sp,
                 color = OnSurfaceVariantMuted,
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(top = 4.dp)
             )
 
-            // Playful Language Chips
-            Row(
-                modifier = Modifier
-                    .padding(top = 16.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                AppLanguage.entries.forEach { lang ->
-                    val isSelected = currentLang == lang
-                    val chipColor = when (lang) {
-                        AppLanguage.ENGLISH -> CelestialGold
-                        AppLanguage.TAMIL -> KidsGreen
-                        AppLanguage.TELUGU -> KidsPink
-                    }
 
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 4.dp)
-                            .clip(CircleShape)
-                            .background(if (isSelected) chipColor.copy(alpha = 0.25f) else SurfaceContainer)
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) chipColor else chipColor.copy(alpha = 0.4f),
-                                shape = CircleShape
-                            )
-                            .clickable { viewModel.setLanguage(lang) }
-                            .padding(horizontal = 18.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = lang.displayName,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) chipColor else OnSurfaceLight
+
+            // Category Tabs
+            LazyRow(
+                modifier = Modifier
+                    .padding(top = 12.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(categories) { cat ->
+                    val isSelected = selectedCategory == cat
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedCategory = cat },
+                        label = { Text(cat, fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = CelestialGold,
+                            selectedLabelColor = OnPrimaryDark,
+                            containerColor = SurfaceContainer,
+                            labelColor = OnSurfaceLight
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = CelestialGold.copy(alpha = 0.5f)
                         )
-                    }
+                    )
                 }
             }
         }
 
-        // Featured Story Bento Card (Noah's Ark)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("featured_kids_story_card")
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .border(2.dp, KidsBlue.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
-                    .clickable { onOpenStory(featuredStory) },
-                shape = RoundedCornerShape(24.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(320.dp)
-                ) {
-                    AsyncImage(
-                        model = featuredStory.imageUrl,
-                        contentDescription = featuredStory.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
+        // Featured Story Bento Card
+        featuredStory.let { story ->
+            val storyScore = quizScores[story.id]
 
-                    // Gradient Overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        SurfaceDark.copy(alpha = 0.6f),
-                                        SurfaceDark.copy(alpha = 0.95f)
-                                    )
-                                )
-                            )
-                    )
-
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(20.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Explore,
-                                contentDescription = null,
-                                tint = KidsOrange,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Text(
-                                text = "FEATURED ADVENTURE",
-                                fontSize = 11.sp,
-                                letterSpacing = 1.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CelestialGold
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = featuredStory.title,
-                            fontFamily = FontFamily.Serif,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = OnSurfaceLight
-                        )
-
-                        Text(
-                            text = featuredStory.subtitle,
-                            fontSize = 13.sp,
-                            color = OnSurfaceVariantMuted,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Button(
-                            onClick = { onOpenStory(featuredStory) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = CelestialGold,
-                                contentColor = OnPrimaryDark
-                            ),
-                            shape = CircleShape,
-                            modifier = Modifier.testTag("read_featured_story_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Read Story",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Read Story",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Accent New Badge
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .clip(CircleShape)
-                    .background(KidsOrange)
-                    .padding(8.dp)
+                    .fillMaxWidth()
+                    .testTag("featured_kids_story_card")
             ) {
-                Icon(
-                    imageVector = Icons.Default.NewReleases,
-                    contentDescription = "New",
-                    tint = SurfaceDark,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-
-        // More Stories Section
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(24.dp))
+                        .border(2.dp, KidsBlue.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                        .clickable { onOpenStory(story) },
+                    shape = RoundedCornerShape(24.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        tint = KidsGreen,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = "More Stories",
-                        fontFamily = FontFamily.Serif,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = OnSurfaceLight
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = { },
-                    shape = CircleShape
-                ) {
-                    Text(text = "View All", fontSize = 11.sp, color = CelestialGold)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowForward,
-                        contentDescription = null,
-                        tint = CelestialGold,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
-
-            HorizontalDivider(color = KidsGreen.copy(alpha = 0.2f))
-
-            // Grid 2 Columns
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                otherStories.forEach { story ->
-                    val badgeColor = Color(story.badgeColorHex)
-
-                    Card(
+                    Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(20.dp))
-                            .border(1.5.dp, badgeColor.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-                            .clickable { onOpenStory(story) },
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = SurfaceContainer)
+                            .fillMaxWidth()
+                            .height(340.dp)
                     ) {
-                        Column {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(130.dp)
-                            ) {
-                                AsyncImage(
-                                    model = story.imageUrl,
-                                    contentDescription = story.title,
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                        AsyncImage(
+                            model = story.imageUrl,
+                            contentDescription = story.title(currentLang),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
 
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .background(
-                                            Brush.verticalGradient(
-                                                colors = listOf(Color.Transparent, SurfaceContainer)
-                                            )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            SurfaceDark.copy(alpha = 0.5f),
+                                            SurfaceDark.copy(alpha = 0.95f)
                                         )
-                                )
-
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(8.dp)
-                                        .clip(CircleShape)
-                                        .background(badgeColor)
-                                        .padding(6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = if (story.badgeIcon == "bolt") Icons.Default.Bolt else Icons.Default.Shield,
-                                        contentDescription = null,
-                                        tint = SurfaceDark,
-                                        modifier = Modifier.size(16.dp)
                                     )
+                                )
+                        )
+
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(18.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Explore,
+                                    contentDescription = null,
+                                    tint = KidsOrange,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "${story.category.uppercase()} • FEATURED",
+                                    fontSize = 11.sp,
+                                    letterSpacing = 1.2.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = CelestialGold
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = story.title(currentLang),
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OnSurfaceLight
+                            )
+
+                            Text(
+                                text = story.subtitle(currentLang),
+                                fontSize = 13.sp,
+                                color = OnSurfaceVariantMuted,
+                                maxLines = 2,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+
+                            // Quiz Score Badge if completed
+                            storyScore?.let { score ->
+                                Surface(
+                                    color = KidsGreen.copy(alpha = 0.9f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.padding(top = 8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.EmojiEvents,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = "Marks: ${score.scoreMarks}/100 ⭐ Grade: ${score.grade}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    }
                                 }
                             }
 
-                            Column(modifier = Modifier.padding(14.dp)) {
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Button(
+                                    onClick = { onOpenStory(story) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = CelestialGold),
+                                    shape = CircleShape,
+                                    modifier = Modifier.testTag("read_featured_story_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PlayArrow,
+                                        contentDescription = null,
+                                        tint = OnPrimaryDark,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Read Story",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = OnPrimaryDark
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = { viewModel.startStoryQuiz(story) },
+                                    shape = CircleShape
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.School,
+                                        contentDescription = null,
+                                        tint = CelestialGold,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Take Quiz 🎓",
+                                        fontSize = 12.sp,
+                                        color = CelestialGold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Remaining Stories List
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(
+                text = "All Bible Adventures",
+                fontFamily = FontFamily.Serif,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = OnSurfaceLight
+            )
+
+            remainingStories.forEach { story ->
+                val badgeColor = Color(story.badgeColorHex)
+                val storyScore = quizScores[story.id]
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(20.dp))
+                        .border(1.dp, badgeColor.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                        .clickable { onOpenStory(story) },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceContainer)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Story Image Thumbnail
+                        Box(
+                            modifier = Modifier
+                                .size(90.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                        ) {
+                            AsyncImage(
+                                model = story.imageUrl,
+                                contentDescription = story.title(currentLang),
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        // Details
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = story.title(currentLang),
+                                fontFamily = FontFamily.Serif,
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OnSurfaceLight
+                            )
+                            Text(
+                                text = story.subtitle(currentLang),
+                                fontSize = 12.sp,
+                                color = OnSurfaceVariantMuted,
+                                maxLines = 2,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+
+                            // Quiz Score Indicator
+                            storyScore?.let { score ->
                                 Text(
-                                    text = story.title,
-                                    fontFamily = FontFamily.Serif,
-                                    fontSize = 18.sp,
+                                    text = "Marks: ${score.scoreMarks}/100 Marks ⭐ Grade ${score.grade}",
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = OnSurfaceLight
-                                )
-                                Text(
-                                    text = story.subtitle,
-                                    fontSize = 12.sp,
-                                    color = OnSurfaceVariantMuted,
-                                    maxLines = 2,
+                                    color = KidsGreen,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
+                            }
+
+                            Row(
+                                modifier = Modifier.padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    color = CelestialGold.copy(alpha = 0.2f),
+                                    shape = CircleShape,
+                                    modifier = Modifier.clickable { onOpenStory(story) }
+                                ) {
+                                    Text(
+                                        text = "Read 📖",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CelestialGold,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+
+                                Surface(
+                                    color = KidsGreen.copy(alpha = 0.2f),
+                                    shape = CircleShape,
+                                    modifier = Modifier.clickable { viewModel.startStoryQuiz(story) }
+                                ) {
+                                    Text(
+                                        text = "Take Quiz 🎓",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = KidsGreen,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
                             }
                         }
                     }

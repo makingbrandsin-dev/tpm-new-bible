@@ -3,6 +3,9 @@ package com.example.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.audio.AudioPlayerManager
+import com.example.audio.ExoPlaybackState
+import com.example.data.BibleCatalog
 import com.example.data.BibleDatabase
 import com.example.data.BibleRepository
 import com.example.data.FlashcardEntity
@@ -11,6 +14,7 @@ import com.example.data.VerseEntity
 import com.example.model.AppLanguage
 import com.example.model.KidsStory
 import com.example.model.MediaItem
+import com.example.model.StoryQuizResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,18 +32,14 @@ enum class MainTab {
     MEMORIZATION
 }
 
-data class AudioState(
-    val currentItem: MediaItem? = null,
-    val isPlaying: Boolean = false,
-    val progress: Float = 0.35f,
-    val currentTimeStr: String = "01:24",
-    val totalTimeStr: String = "04:32"
-)
-
 class BibleViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = BibleDatabase.getDatabase(application)
     val repository = BibleRepository(db.bibleDao())
+
+    // Jetpack Media3 ExoPlayer Audio Player Manager
+    val audioPlayerManager = AudioPlayerManager(application)
+    val exoPlaybackState: StateFlow<ExoPlaybackState> = audioPlayerManager.playbackState
 
     private val _selectedTab = MutableStateFlow(MainTab.HOME)
     val selectedTab: StateFlow<MainTab> = _selectedTab.asStateFlow()
@@ -47,13 +47,16 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
     private val _currentLanguage = MutableStateFlow(AppLanguage.ENGLISH)
     val currentLanguage: StateFlow<AppLanguage> = _currentLanguage.asStateFlow()
 
+    private val _showLanguageSetupDialog = MutableStateFlow(false)
+    val showLanguageSetupDialog: StateFlow<Boolean> = _showLanguageSetupDialog.asStateFlow()
+
     private val _selectedBook = MutableStateFlow("John")
     val selectedBook: StateFlow<String> = _selectedBook.asStateFlow()
 
     private val _selectedChapter = MutableStateFlow(1)
     val selectedChapter: StateFlow<Int> = _selectedChapter.asStateFlow()
 
-    private val _selectedVerseId = MutableStateFlow<String?>("John_1_3")
+    private val _selectedVerseId = MutableStateFlow<String?>("John_1_1")
     val selectedVerseId: StateFlow<String?> = _selectedVerseId.asStateFlow()
 
     private val _fontSizeSp = MutableStateFlow(20)
@@ -62,14 +65,6 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
     private val _isSerifFont = MutableStateFlow(true)
     val isSerifFont: StateFlow<Boolean> = _isSerifFont.asStateFlow()
 
-    private val _audioState = MutableStateFlow(
-        AudioState(
-            currentItem = repository.getSampleMedia().first(),
-            isPlaying = false
-        )
-    )
-    val audioState: StateFlow<AudioState> = _audioState.asStateFlow()
-
     // Kids Story State
     private val _activeKidsStory = MutableStateFlow<KidsStory?>(null)
     val activeKidsStory: StateFlow<KidsStory?> = _activeKidsStory.asStateFlow()
@@ -77,17 +72,48 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
     private val _activeStoryPage = MutableStateFlow(1)
     val activeStoryPage: StateFlow<Int> = _activeStoryPage.asStateFlow()
 
+    // Quiz & Exam State
+    private val _activeQuizStory = MutableStateFlow<KidsStory?>(null)
+    val activeQuizStory: StateFlow<KidsStory?> = _activeQuizStory.asStateFlow()
+
+    private val _quizScores = MutableStateFlow<Map<String, StoryQuizResult>>(
+        mapOf(
+            "noahs_ark" to StoryQuizResult(
+                storyId = "noahs_ark",
+                totalQuestions = 2,
+                correctAnswers = 2,
+                scoreMarks = 100,
+                grade = "A+",
+                starsEarned = 3
+            )
+        )
+    )
+    val quizScores: StateFlow<Map<String, StoryQuizResult>> = _quizScores.asStateFlow()
+
     // Drawer State
     private val _isDrawerOpen = MutableStateFlow(false)
     val isDrawerOpen: StateFlow<Boolean> = _isDrawerOpen.asStateFlow()
 
-    // Verse List from Room
-    val currentVerses: StateFlow<List<VerseEntity>> = repository.getVerses("John", 1)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    // Dynamic Verses from BibleCatalog for selected book & chapter combined with database bookmark overrides
+    val currentVerses: StateFlow<List<VerseEntity>> = combine(
+        _selectedBook,
+        _selectedChapter,
+        repository.getBookmarkedVerses()
+    ) { book, chapter, bookmarks ->
+        val generated = BibleCatalog.generateVersesForChapter(book, chapter)
+        val bookmarkIds = bookmarks.map { it.id }.toSet()
+        generated.map { v ->
+            if (bookmarkIds.contains(v.id)) {
+                v.copy(isBookmarked = true)
+            } else {
+                v
+            }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = BibleCatalog.generateVersesForChapter("John", 1)
+    )
 
     val bookmarkedVerses: StateFlow<List<VerseEntity>> = repository.getBookmarkedVerses()
         .stateIn(
@@ -111,6 +137,15 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     init {
+        val prefs = application.getSharedPreferences("tpm_bible_prefs", android.content.Context.MODE_PRIVATE)
+        val isLanguageSet = prefs.getBoolean("is_default_language_set", false)
+        if (!isLanguageSet) {
+            _showLanguageSetupDialog.value = true
+        } else {
+            val savedLang = prefs.getString("default_language", AppLanguage.ENGLISH.name)
+            _currentLanguage.value = try { AppLanguage.valueOf(savedLang ?: "ENGLISH") } catch (e: Exception) { AppLanguage.ENGLISH }
+        }
+
         viewModelScope.launch {
             repository.seedInitialDataIfNeeded()
         }
@@ -122,6 +157,34 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setLanguage(language: AppLanguage) {
         _currentLanguage.value = language
+        val prefs = getApplication<Application>().getSharedPreferences("tpm_bible_prefs", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putString("default_language", language.name).putBoolean("is_default_language_set", true).apply()
+    }
+
+    fun dismissLanguageSetupDialog() {
+        _showLanguageSetupDialog.value = false
+    }
+
+    fun openLanguageSetupDialog() {
+        _showLanguageSetupDialog.value = true
+    }
+
+    fun selectBook(bookName: String) {
+        _selectedBook.value = bookName
+        _selectedChapter.value = 1
+        _selectedVerseId.value = null
+    }
+
+    fun selectChapter(chapterNum: Int) {
+        val maxChaps = BibleCatalog.findBook(_selectedBook.value).totalChapters
+        _selectedChapter.value = chapterNum.coerceIn(1, maxChaps)
+        _selectedVerseId.value = null
+    }
+
+    fun changeChapter(delta: Int) {
+        val maxChaps = BibleCatalog.findBook(_selectedBook.value).totalChapters
+        val newChap = (_selectedChapter.value + delta).coerceIn(1, maxChaps)
+        _selectedChapter.value = newChap
     }
 
     fun selectVerse(id: String?) {
@@ -134,18 +197,30 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun toggleAudioPlayPause() {
-        _audioState.value = _audioState.value.copy(isPlaying = !_audioState.value.isPlaying)
+    // Audio Playback with Media3 ExoPlayer
+    fun playCurrentChapterAudio() {
+        val bookInfo = BibleCatalog.findBook(_selectedBook.value)
+        val title = "${bookInfo.nameForLanguage(_currentLanguage.value)} Chapter ${_selectedChapter.value}"
+        val subtitle = "Audio Bible Stream - ${bookInfo.testament} Testament"
+        val url = BibleCatalog.getAudioStreamUrl(_selectedBook.value, _selectedChapter.value)
+        audioPlayerManager.playChapterAudio(title, subtitle, url)
     }
 
     fun playMediaItem(item: MediaItem) {
-        _audioState.value = AudioState(
-            currentItem = item,
-            isPlaying = true,
-            progress = 0.1f,
-            currentTimeStr = "00:15",
-            totalTimeStr = item.duration
+        audioPlayerManager.playMedia(item)
+    }
+
+    fun playKidsStoryNarration(storyTitle: String, pageNumber: Int) {
+        val streamUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
+        audioPlayerManager.playChapterAudio(
+            title = storyTitle,
+            subtitle = "Kids Story Audio Narration - Page $pageNumber",
+            streamUrl = streamUrl
         )
+    }
+
+    fun toggleAudioPlayPause() {
+        audioPlayerManager.togglePlayPause()
     }
 
     fun setNotificationEnabled(enabled: Boolean) {
@@ -192,6 +267,36 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun startStoryQuiz(story: KidsStory) {
+        _activeQuizStory.value = story
+    }
+
+    fun closeStoryQuiz() {
+        _activeQuizStory.value = null
+    }
+
+    fun submitQuizResult(storyId: String, correctCount: Int, totalCount: Int) {
+        val total = if (totalCount <= 0) 1 else totalCount
+        val percentage = ((correctCount.toFloat() / total) * 100).toInt()
+        val marks = percentage
+        val (grade, stars) = when {
+            percentage >= 90 -> "A+" to 3
+            percentage >= 70 -> "A" to 3
+            percentage >= 50 -> "B" to 2
+            else -> "C" to 1
+        }
+        val result = StoryQuizResult(
+            storyId = storyId,
+            totalQuestions = total,
+            correctAnswers = correctCount,
+            scoreMarks = marks,
+            maxMarks = 100,
+            grade = grade,
+            starsEarned = stars
+        )
+        _quizScores.value = _quizScores.value + (storyId to result)
+    }
+
     fun markFlashcardMastered(flashcard: FlashcardEntity) {
         viewModelScope.launch {
             repository.updateFlashcard(flashcard.copy(isMastered = !flashcard.isMastered))
@@ -217,8 +322,8 @@ class BibleViewModel(application: Application) : AndroidViewModel(application) {
         _isDrawerOpen.value = open ?: !_isDrawerOpen.value
     }
 
-    fun changeChapter(delta: Int) {
-        val newChap = (_selectedChapter.value + delta).coerceIn(1, 21)
-        _selectedChapter.value = newChap
+    override fun onCleared() {
+        super.onCleared()
+        audioPlayerManager.release()
     }
 }
